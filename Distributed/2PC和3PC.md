@@ -81,8 +81,8 @@
 
 ### 容错
 
-1. **网络错误**：协调者和参与者之间出现networking partitioning, 互不可达. 普遍解决方法是: **重试+幂等+超时**.
-2. **协调者/参与者宕机崩溃**: 服务要做到high availability, 普遍采用一主多备, 在服务崩溃时, 及时地fail over. 比如多个协调者构成RSM, 如Spanner中的Paxos group, 其他系统也可能采用Raft group.
+1. **网络错误**：协调者和参与者之间出现networking partitioning， 互不可达. 普遍解决方法是: **重试+幂等+超时**.
+2. **协调者/参与者宕机崩溃**: 服务要做到high availability， 普遍采用一主多备， 在服务崩溃时， 及时地fail over. 比如多个协调者构成RSM， 如Spanner中的Paxos group， 其他系统也可能采用Raft group.
 
 ### 恢复
 
@@ -92,33 +92,33 @@
 
 协调者扫描日志:
 
-1. 只有 `<prepare T>` : 说明事务处于outstanding状态（橙色区域）, 协调者终止事务即可, 即从图中`<abort T>`做起.
-2. 有 `<commit T>` 但无 `<complete T>` : 说明事务已经提交, 但可能尚未通知参与者, 则从 `<commit T>`做起, roll forward, 通知全体参与者做commit和apply.
-3. 有 `<abort T>` 但无 `<complete T>` : 说明事务已经失败, 从 `<abort T>` 做起, rollback, 通知全体参与者做终止事务.
+1. 只有 `<prepare T>` : 说明事务处于outstanding状态（橙色区域）， 协调者终止事务即可， 即从图中`<abort T>`做起.
+2. 有 `<commit T>` 但无 `<complete T>` : 说明事务已经提交， 但可能尚未通知参与者， 则从 `<commit T>`做起， roll forward， 通知全体参与者做commit和apply.
+3. 有 `<abort T>` 但无 `<complete T>` : 说明事务已经失败， 从 `<abort T>` 做起， rollback， 通知全体参与者做终止事务.
 4. 有`<complete T>`: 事务已经完成. 无需处理.
 
 #### 参与者恢复
 
 参与者扫描日志：
 
-1. 如果有 `<no T>` 或 `<abort T>` 记录: 说明事务已经失败, 则可以单方面rollback.
-2. 如果有 `<commit T>` : 说明事务已经成功提交, 则做本地redo操作即可.
-3. 如果只有 `<ready T>` : 协调者无法判断事务的执行状态, 当前事务处于in-doubt状态. 见下文详细描述.
+1. 如果有 `<no T>` 或 `<abort T>` 记录: 说明事务已经失败， 则可以单方面rollback.
+2. 如果有 `<commit T>` : 说明事务已经成功提交， 则做本地redo操作即可.
+3. 如果只有 `<ready T>` : 协调者无法判断事务的执行状态， 当前事务处于in-doubt状态. 见下文详细描述.
 
 #### In-doubt事务的恢复:
 
-事务的状态无非outstanding, committed, aborted, complete. 之所以处于in-doubt状态, 是因为故障导致信息缺失, 无法判断事务究竟处于三种状态outstanding, committed, aborted中的哪一种.
+事务的状态无非outstanding， committed， aborted， complete. 之所以处于in-doubt状态， 是因为故障导致信息缺失， 无法判断事务究竟处于三种状态outstanding， committed， aborted中的哪一种.
 
-1. 在协调者可用情况下, 首先询问协调者关于事务T的状态. 如果T处于**outstanding**或**aborted**状态, 则**终止事务**T, **rollback**.
-2. 在协调者不可用情况下, 询问当前可用的其他参与者关于事务T的状态. 如果事务T明确地处于**committed**或者**aborted**状态, 则选择**roll forward**或者**rollback**即可.
-3. 最糟糕的一种情况: 协调者不可用, 并且当前可用的参与者日志均只有记录. 此时无法采取行动, 因为:
-   1. 事务T可能处于committed状态: 协调者不可用, 全体参与者都投票 `<ready T>` .
+1. 在协调者可用情况下， 首先询问协调者关于事务T的状态. 如果T处于**outstanding**或**aborted**状态， 则**终止事务**T， **rollback**.
+2. 在协调者不可用情况下， 询问当前可用的其他参与者关于事务T的状态. 如果事务T明确地处于**committed**或者**aborted**状态， 则选择**roll forward**或者**rollback**即可.
+3. 最糟糕的一种情况: 协调者不可用， 并且当前可用的参与者日志均只有记录. 此时无法采取行动， 因为:
+   1. 事务T可能处于committed状态: 协调者不可用， 全体参与者都投票 `<ready T>` .
    2. 事务T可能处于aborted状态: 协调者和全体投反对票 `<no T>` 的参与者不可用.
-   3. 事务T可能处于outstanding状态: 协调者不可用, 并崩溃之前, 并未写下 `<commit T>` 或 `<abort T>` .
+   3. 事务T可能处于outstanding状态: 协调者不可用， 并崩溃之前， 并未写下 `<commit T>` 或 `<abort T>` .
 
-这种情况下: 只有当协调者恢复之后, 才能继续推进. 如果系统中有其他的协调者, 并且该协调者上执行的事务和in-doubt事务有冲突; 则要么自杀, 要么等待in-doubt事务恢复后, 才能推进。
+这种情况下: 只有当协调者恢复之后， 才能继续推进. 如果系统中有其他的协调者， 并且该协调者上执行的事务和in-doubt事务有冲突; 则要么自杀， 要么等待in-doubt事务恢复后， 才能推进。
 
-in-doubt事务, 充分地说明了协调者的高可用至关重要。
+in-doubt事务， 充分地说明了协调者的高可用至关重要。
 
 ### 总结
 
@@ -185,9 +185,9 @@ in-doubt事务, 充分地说明了协调者的高可用至关重要。
 
 ### 3PC的缺陷
 
-1. 3PC可以有效的处理fail-stop（节点永久性崩溃）的模式, 但不能处理网络划分(network partition)的情况，即节点互相不能通信. 假设在PreCommit阶段所有节点被一分为二, 收到preCommit消息的参与者在一边, 而没有收到这个消息的在另外一边. 在这种情况下, 两边就可能会选出新的协调者而做出不同的决定.
+1. 3PC可以有效的处理fail-stop（节点永久性崩溃）的模式， 但不能处理网络划分(network partition)的情况，即节点互相不能通信. 假设在PreCommit阶段所有节点被一分为二， 收到preCommit消息的参与者在一边， 而没有收到这个消息的在另外一边. 在这种情况下， 两边就可能会选出新的协调者而做出不同的决定.
 
-2. 除了网络划分以外, 3PC也不能处理fail-recover（节点暂时性崩溃）的错误情况. 简单说来，当协调者收到preCommit的确认前宕机, 于是其他某一个参与者接替了原协调者的任务而开始组织所有参与者 commit. 而与此同时原协调者重启后又回到了网络中, 开始继续之前的回合，即发送abort给各位参与者，因为它并没有收到preCommit. 此时有可能会出现原协调者和继任的协调者给不同节点发送相矛盾的commit和abort指令, 从而出现个节点的状态分歧.
+2. 除了网络划分以外， 3PC也不能处理fail-recover（节点暂时性崩溃）的错误情况. 简单说来，当协调者收到preCommit的确认前宕机， 于是其他某一个参与者接替了原协调者的任务而开始组织所有参与者 commit. 而与此同时原协调者重启后又回到了网络中， 开始继续之前的回合，即发送abort给各位参与者，因为它并没有收到preCommit. 此时有可能会出现原协调者和继任的协调者给不同节点发送相矛盾的commit和abort指令， 从而出现个节点的状态分歧.
 3. 脑裂问题依然存在，即在参与者收到PreCommit请求后等待最终指令，如果此时协调者无法与参与者正常通信，会导致参与者继续提交事务，造成数据不一致。
 
 ### 宕机情况下的讨论
