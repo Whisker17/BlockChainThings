@@ -146,3 +146,74 @@ P2c：对于任意的N和V，如果提案[N, V]被提出，那么存在一个半
 2. S中Acceptor接受过的最大编号的提案的value为V。
 ```
 
+如果这两条均不满足，即存在Acceptor接受过小于N的提案，且同时Acceptor接受过的最大编号的提案的value不是V，那么这就和我们之前所设计的方案冲突了，所以这是不正确的。
+
+### Proposer生成提案
+
+为了满足P2b，这里有个比较重要的思想：Proposer生成提案之前，应该先去**『学习』**已经被选定或者可能被选定的value，然后以该value作为自己提出的提案的value。**如果没有value被选定，Proposer才可以自己决定value的值**。这样才能达成一致。这个学习的阶段是通过一个**『Prepare请求』**实现的。
+
+于是我们得到了如下的**提案生成算法：**
+
+1. Proposer选择一个**新的提案编号N**，然后向**某个Acceptor集合**（半数以上）发送请求，要求该集合中的每个Acceptor做出如下响应（response）。
+  (a) 向Proposer承诺保证**不再接受**任何编号小于N的提案。
+  (b) 如果Acceptor已经接受过提案，那么就向Proposer响应**已经接受过**的编号小于N的**最大编号**的提案。
+
+我们将该请求称为**编号为N**的**Prepare请求**。
+
+2. 如果Proposer收到了**半数以上**的Acceptor的**响应**，那么它就可以生成编号为N，Value为V的**提案[N,V]**。这里的V是所有的响应中**编号最大的提案的Value**。如果所有的响应中**都没有提案**，那么此时V就可以由Proposer**自己选择**。
+  生成提案后，Proposer将该**提案**发送给**半数以上**的Acceptor集合，并期望这些Acceptor能接受该提案。我们称该请求为**Accept请求**。**（注意：此时接受Accept请求的Acceptor集合不一定是之前响应Prepare请求的Acceptor集合）**
+
+### Acceptor接受提案
+
+Acceptor可以**忽略任何请求**（包括Prepare请求和Accept请求）而不用担心破坏算法的安全性。因此，我们这里要讨论的是什么时候Acceptor可以响应一个请求。
+
+我们对Acceptor接受提案给出如下约束：
+
+```
+P1a：一个Acceptor只要尚未响应过任何编号大于N的Prepare请求，那么他就可以接受这个编号为N的提案。
+```
+
+如果Acceptor收到一个编号为N的Prepare请求，在此之前它已经响应过编号大于N的Prepare请求。根据P1a，**该Acceptor不可能接受编号为N的提案**。因此，该Acceptor可以忽略编号为N的Prepare请求。当然，也可以回复一个error，让Proposer尽早知道自己的提案不会被接受。
+
+因此，一个Acceptor只需记住：
+
+1. 已接受的编号最大的提案 
+
+2. 已响应的请求的最大编号。
+
+![优化](./pics/Paxos_4.png)
+
+## 算法流程
+
+经过上面的推导，我们总结下Paxos算法的流程。
+
+Paxos算法分为两个阶段。具体如下：
+
+- **阶段一：**
+
+(a) Proposer选择一个提案编号N，然后向半数以上的Acceptor发送编号为N的Prepare请求。
+
+(b) 如果一个Acceptor收到一个编号为N的Prepare请求，且**N大于该Acceptor已经响应过的所有Prepare请求的编号**，那么它就会将它已经**接受过的编号最大的提案**（如果有的话）作为响应反馈给Proposer，同时该Acceptor**承诺不再接受任何编号小于N的提案**。
+
+- **阶段二：**
+
+(a) 如果Proposer收到半数以上Acceptor对其发出的编号为N的Prepare请求的响应，那么它就会发送一个针对[N,V]提案的**Accept请求**给半数以上的Acceptor。注意：V就是收到的响应中编号最大的提案的value，**如果响应中不包含任何提案，那么V就由Proposer自己决定**。
+
+(b) 如果Acceptor收到一个针对编号为N的提案的Accept请求，只要该Acceptor没有对**编号大于N的Prepare请求**做出过响应，它就接受该提案。
+
+![Paxos算法流程](./pics/Paxos_5.png)
+
+那么，我们来引入一张wiki上的流程图，就可以清晰地分析出Paxos的简单流程了：
+
+```
+Client   Proposer      Acceptor     Learner
+   |         |          |  |  |       |  |
+   X-------->|          |  |  |       |  |  Request
+   |         X--------->|->|->|       |  |  Prepare(1)
+   |         |<---------X--X--X       |  |  Promise(1,{Va,Vb,Vc})
+   |         X--------->|->|->|       |  |  Accept!(1,Vn)
+   |         |<---------X--X--X------>|->|  Accepted(1,Vn)
+   |<---------------------------------X--X  Response
+   |         |          |  |  |       |  |
+```
+
