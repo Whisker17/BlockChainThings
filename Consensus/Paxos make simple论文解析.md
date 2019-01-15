@@ -203,7 +203,26 @@ Paxos算法分为两个阶段。具体如下：
 
 ![Paxos算法流程](./pics/Paxos_5.png)
 
-那么，我们来引入一张wiki上的流程图，就可以清晰地分析出Paxos的简单流程了：
+Paxos算法流程中的每条消息描述如下：
+
+- **Prepare**: Proposer生成全局唯一且递增的Proposal ID (可使用时间戳加Server ID)，向所有Acceptors发送Prepare请求，这里无需携带提案内容，只携带Proposal ID即可。
+- **Promise**: Acceptors收到Prepare请求后，做出“**两个承诺，一个应答**”。
+
+**两个承诺**：
+
+1. 不再接受Proposal ID**小于等于**（注意：这里是<= ）当前请求的**Prepare**请求。
+
+2. 不再接受Proposal ID**小于**（注意：这里是< ）当前请求的**Propose**请求。
+
+**一个应答**：
+
+不违背以前作出的承诺下，回复已经Accept过的提案中Proposal ID最大的那个提案的Value和Proposal ID，没有则返回空值。
+
+- **Propose**: Proposer 收到多数Acceptors的Promise应答后，从应答中选择Proposal ID最大的提案的Value，作为本次要发起的提案。如果所有应答的提案Value均为空值，则可以自己随意决定提案Value。然后携带当前Proposal ID，向所有Acceptors发送Propose请求。
+- **Accept**: Acceptor收到Propose请求后，在不违背自己之前作出的承诺下，接受并持久化当前Proposal ID和提案Value。
+- **Learn**: Proposer收到多数Acceptors的Accept后，决议形成，将形成的决议发送给所有Learners。
+
+那么，我们来引入一张wiki上的流程图，就可以清晰地分析出Basic Paxos的简单流程了：
 
 ```
 Client   Proposer      Acceptor     Learner
@@ -217,3 +236,35 @@ Client   Proposer      Acceptor     Learner
    |         |          |  |  |       |  |
 ```
 
+接下来，我们来讨论一个比较复杂的情况：
+
+```
+Client   Leader         Acceptor     Learner
+   |      |             |  |  |       |  |
+   X----->|             |  |  |       |  |  Request
+   |      X------------>|->|->|       |  |  Prepare(1)
+   |      |<------------X--X--X       |  |  Promise(1,{null,null,null})
+   |      !             |  |  |       |  |  !! LEADER FAILS
+   |         |          |  |  |       |  |  !! NEW LEADER (knows last number was 1)
+   |         X--------->|->|->|       |  |  Prepare(2)
+   |         |<---------X--X--X       |  |  Promise(2,{null,null,null})
+   |      |  |          |  |  |       |  |  !! OLD LEADER recovers
+   |      |  |          |  |  |       |  |  !! OLD LEADER tries 2, denied
+   |      X------------>|->|->|       |  |  Prepare(2)
+   |      |<------------X--X--X       |  |  Nack(2)
+   |      |  |          |  |  |       |  |  !! OLD LEADER tries 3
+   |      X------------>|->|->|       |  |  Prepare(3)
+   |      |<------------X--X--X       |  |  Promise(3,{null,null,null})
+   |      |  |          |  |  |       |  |  !! NEW LEADER proposes, denied
+   |      |  X--------->|->|->|       |  |  Accept!(2,Va)
+   |      |  |<---------X--X--X       |  |  Nack(3)
+   |      |  |          |  |  |       |  |  !! NEW LEADER tries 4
+   |      |  X--------->|->|->|       |  |  Prepare(4)
+   |      |  |<---------X--X--X       |  |  Promise(4,{null,null,null})
+   |      |  |          |  |  |       |  |  !! OLD LEADER proposes, denied
+   |      X------------>|->|->|       |  |  Accept!(3,Vb)
+   |      |<------------X--X--X       |  |  Nack(4)
+   |      |  |          |  |  |       |  |  ... and so on ...
+```
+
+这就是一种**活锁**的现象，要解决这样的问题，Basic Paxos并不可以，就需要引入Multi Paxos。
