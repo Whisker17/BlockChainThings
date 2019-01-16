@@ -236,7 +236,19 @@ Client   Proposer      Acceptor     Learner
    |         |          |  |  |       |  |
 ```
 
-接下来，我们来讨论一个比较复杂的情况：
+#### Learner学习被选定的value
+
+Learner学习（获取）被选定的value有如下三种方案：
+
+![Learner](./pics/Paxos_6.png)
+
+#### 如何保证Paxos的活性（liveness）
+
+![Liveness](./pics/Paxos_7.png)
+
+通过选取**主Proposer**，就可以保证Paxos算法的活性。至此，我们得到一个既能保证安全性，又能保证活性的分布式一致性算法——Paxos算法。
+
+**接下来，我们来讨论一个比较复杂的情况**：
 
 ```
 Client   Leader         Acceptor     Learner
