@@ -26,8 +26,6 @@ Multi-Paxos是通过Paxos算法来确定很多个值，而且这些值的顺序�
 
 但是由于Basic Paxos的Latency很高，所以我们需要进行一些优化，省去其中的一些步骤。
 
-
-
 ## 概念
 
 Multi-Paxos中的Multi体现在，这是一个多次Paxos的过程，首先，我们需要进行一次Paxos的过程来确定一个Leader，而当我们能够确认一个稳定的Leader之后，我们就可以省去选举Leader的过程，而直接进行共识的阶段，这也就是为什么Multi-Paxos能够比Basic Paxos更快的原因。
@@ -62,5 +60,18 @@ Client   Proposer       Acceptor     Learner
 
 此时，我们**跳过了第一阶段**，直接进入一个广播的阶段，要注意的是，这里的Leader是需要保证稳定的。
 
+## Leader的选取
+
+虽然Multi-Paxos允许并行提交，但这种情况下效率是要退化到Basic Paxos的，所以我们并不希望长时间处于这种情况，Leader的作用是希望大部分时间都只有一个节点在提交，这样才能最大发挥Mulit-Paxos的优化效果。
+
+我们观察Multi-Paxos可以发现，如何才会打破一个连续的Accept指令，这就是出现一个Promise指令，即出现了其他节点的Prepare提交。那么，我们该如何避免其他节点的提交呢？
+
+**收到来自其他节点的Accept，则进行一段时间的拒绝提交请求。**
+
+
+
 ## 优化
 
+1. 我们可以选取一个Learner作为一个Learner中的Leader的角色，由他来进行广播
+2. Proposer只能将proposal发给Leader而不是所有的节点
+3. 可以发送V的hash而不是原始数据
