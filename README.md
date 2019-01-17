@@ -4,5 +4,5 @@
 
 这个repo是我将我之前所阅读过的一些文章和自己的一些笔记进行的整理。
 
-[2PC与3PC]: ./Consensus/2PC和3PC.md
+[2PC与3PC]: ./Consensus/2PC和3PC.md	"2PC与3PC"
 
