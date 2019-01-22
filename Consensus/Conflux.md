@@ -118,5 +118,26 @@ Epoch有以下原则：
 6. Past返回的是时序上后于给定区块的区块集
 7. TotalOrder返回的是在Pivot Chain上节点的排序
 
-* Pivot Chain的选取
+* **Pivot Chain的选取**
 
+![DAG数据结构](./pics/conflux_5.png)
+
+该函数输入的是一个DAG结构以及一个开始的区块b，返回的是一个从创世区块开始包含b区块的pivot chain的叶子节点区块。	下图是上述算法的解析：
+
+![DAG数据结构](./pics/conflux_6.png)
+
+* **共识主循环**
+
+![DAG数据结构](./pics/conflux_7.png)
+
+我们可以看到，共识主循环一共做了两件主要工作，首先是一个DAG状态的更新；其次是新增一个区块b，过程就是通过Pivo函数找到Pivot Chain的叶子节点，将其作为b的父节点，然后补上所有reference edge，最终通过Gossip Network进行广播
+
+* **全排序**
+
+![DAG数据结构](./pics/conflux_8.png)
+
+我们看到第四行，ConfluxOrder这个函数定义了，通过给定一个DAG结构以及一个在pivot chain上的区块a，就可以返回所有在区块a的epoch之前的区块的list。
+
+![DAG数据结构](./pics/conflux_9.png)
+
+上图解释了该算法的核心
