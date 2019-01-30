@@ -78,6 +78,18 @@ Raft协议的每个副本都会处于三种状态之一：**Leader、Follower、
 * 每个节点只会给每个term投一票，具体的是否同意和后续的Safety有关。
 * 当投票被瓜分后，所有的candidate同时超时，然后有可能进入新一轮的票数被瓜分，为了避免这个问题，Raft采用一种很简单的方法：每个Candidate的election timeout从150ms-300ms之间随机取，那么第一个超时的Candidate就可以发起新一轮的leader election，带着最大的term_id给其它所有server发送RequestVoteRPC消息，从而自己成为leader，然后给他们发送心跳消息以告诉他们自己是主。
 
+不难解释，不是所有的Follower都有资格成为Leader，因为如果一个Follower缺少之前的Leader已经commit的Log，那么它无论如何都无法复制到缺少的那部分Log的，所以我们在这里有一个约束：
+
+**Candidate在拉票时需要携带自己本地已经持久化的最新的日志信息，等待投票的节点如果发现自己本地的日志信息比竞选的Candidate更新，则拒绝给他投票。**
+
+### Log Replication
+
+当Leader被选出来后，就可以接受客户端发来的请求了，每个请求包含一条需要被replicated state machines执行的命令。leader会把它作为一个log entry append到日志中，然后给其它的server发AppendEntriesRPC请求。当Leader确定一个log entry被safely replicated了（大多数副本已经将该命令写入日志当中），就apply这条log entry到状态机中然后返回结果给客户端。如果某个Follower宕机了或者运行的很慢，或者网络丢包了，Leader会无限的重试 AppendEntries RPC直到所有的Followers最终存储了所有的日志条目。
+
+当一条日志是commited时，Leader才可以将它应用到状态机中。Raft保证一条commited的log entry已经持久化了并且会被所有的节点执行。
+
+当一个新的Leader被选出来时，它的日志和其它的Follower的日志可能不一样，这个时候，就需要一个机制来保证日志的一致性。
+
 下面我们来看一个具体的范例：
 
 ![架构](./pics/raft_2.png)
@@ -87,9 +99,82 @@ Raft协议的每个副本都会处于三种状态之一：**Leader、Follower、
 1. 节点f在Term 2时是Leader，在提交了几条记录后，还未执行commit就下线
 2. 节点f在Term 3时再次上线并成为Leader，在提交了几条记录后，还未执行commit（包括Term 2的commit）就又一次下线
 
+当然，在出现上述情况的时候，我们依靠单纯的复制Log是不行的，所以我们需要这样做：
 
+Leader为每一个Follower节点维护一个nextIndex计数，对于每一个Follower节点，首先设置nextIndex为Leader节点的下一个index位置（上图中为11），然后依次向前比较Leader和Follower对应的记录，直到找到重合的记录为止，（对于节点f来说，即上图中的3）再将所有Leader节点的记录复制到Follower节点。
 
+由此，我们可以总结一句话：**Leader负责一致性检查，同时让所有的Follower都和自己保持一致**
 
+------
+
+之前我们说过Leader的选举不是任意的，而是有限制的，即需要Candidate拥有上一任Leader的所有已经commit的Log，但是光光有这个限制是不够的，我们再来看一个实例：
 
 ![架构](./pics/raft_3.png)
+
+1. 在阶段a，term为2，S1是Leader，且S1写入日志（term, index）为(2, 2)，并且日志被同步写入了S2；
+
+2. 在阶段b，S1离线，触发一次新的选主，此时S5被选为新的Leader，（由于S2已同步了term为2的Log，根据之前我们的限制，S2是不会投票给S5的，那么只有可能是S3，S4和S5自己投票给自己，由此让S5成为Leader）此时系统term为3，且写入了日志（term, index）为（3， 2）;
+
+3. S5尚未将日志推送到Followers就离线了，进而触发了一次新的选主，而之前离线的S1经过重新上线后被选中变成Leader，此时系统term为4，此时S1会将自己的日志同步到Followers，按照上图就是将日志（2， 2）同步到了S3，而此时由于该日志已经被同步到了多数节点（S1, S2, S3），因此，此时日志（2，2）可以被commit了。
+
+4. 在阶段d，S1又下线了，触发一次选主，而S5有可能被选为新的Leader（这是因为S5可以满足作为主的一切条件：1. term = 5 > 4，2. 最新的日志为（3，2），比大多数节点（如S2/S3/S4的日志都新）），然后S5会将自己的日志更新到Followers，于是S2、S3中已经被提交的日志（2，2）被截断了。
+
+这就引出了一个问题，我们在增加上述限制后，依旧还存在问题：即使日志（2，2）已经被大多数节点（S1、S2、S3）确认了，但是它不能被提交，因为它是来自之前term（2）的日志，直到S1在当前term（4）产生的日志（4， 4）被大多数Followers确认，S1方可提交日志（4，4）这条日志，当然，根据Raft定义，（4，4）之前的所有日志也会被提交。此时即使S1再下线，重新选主时S5不可能成为Leader，因为它没有包含大多数节点已经拥有的日志（4，4）。
+
+因此，我们对Raft的Leader选举提出了又一个限制：**只允许Leader提交（commit）当前Term的日志**
+
+------
+
+Raft日志同步保证如下两点：
+
+- 如果不同日志中的两个条目有着相同的索引和任期号，则它们所存储的命令是相同的。
+- 如果不同日志中的两个条目有着相同的索引和任期号，则它们之前的所有条目都是完全一样的。
+
+第一条特性源于Leader在一个term内在给定的一个log index最多创建一条日志条目，同时该条目在日志中的位置也从来不会改变。
+
+第二条特性源于 AppendEntries 的一个简单的一致性检查。当发送一个 AppendEntries RPC 时，Leader会把新日志条目紧接着之前的条目的log index和term都包含在里面。如果Follower没有在它的日志中找到log index和term都相同的日志，它就会拒绝新的日志条目。
+
+### Safety
+
+我们来回顾一下之前我们定义的一些约束：
+
+1. **Candidate在拉票时需要携带自己本地已经持久化的最新的日志信息，等待投票的节点如果发现自己本地的日志信息比竞选的Candidate更新，则拒绝给他投票。**
+2. **只允许Leader提交（commit）当前Term的日志**
+
+第一条帮助我们限制了Leader的选举，从而保证了不会有已经被commit的Log因为宕机或者丢包之类的情况而导致的Log丢失。在任何基于Leader的共识算法里，我们必须要保证Leader的正确性，确定Leader包含所有已经commit的Log，这样就可以保证我们的数据流只会从Leader流向Follower，而Leader永远不会重写自己日志中已经存在的entry log。
+
+------
+
+### Log Compaction
+
+在实际的系统中，不能让日志无限增长，否则系统重启时需要花很长的时间进行回放，从而影响availability。Raft采用对整个系统进行snapshot来处理，**snapshot之前的日志都可以丢弃**。Snapshot技术在Chubby和ZooKeeper系统中都有采用。
+
+Raft使用的方案是：**每个副本独立的对自己的系统状态进行Snapshot，并且只能对已经提交的日志记录（已经应用到状态机）进行snapshot。**
+
+Snapshot中包含以下内容：
+
+- 日志元数据。最后一条已提交的 log entry的 log index和term。这两个值在snapshot之后的第一条log entry的AppendEntries RPC的完整性检查的时候会被用上。一旦这个server做完了snapshot，就可以把这条记录的最后一条log index及其之前的所有的log entry都删掉。
+- 系统当前状态。
+
+snapshot的缺点就是**不是增量**的，**即使内存中某个值没有变，下次做snapshot的时候同样会被dump到磁盘**。当leader需要发给某个follower的log entry被丢弃了(因为leader做了snapshot)，leader会将snapshot发给落后太多的follower。或者当新加进一台机器时，也会发送snapshot给它。发送snapshot使用新的RPC，InstalledSnapshot。
+
+做snapshot既不要做的太频繁，否则消耗磁盘带宽， 也不要做的太不频繁，否则一旦节点重启需要回放大量日志，影响可用性。推荐当日志达到某个固定的大小做一次snapshot。
+
+做一次snapshot可能耗时过长，会影响正常日志同步。可以通过使用**copy-on-write**技术避免snapshot过程影响正常日志同步。
+
+### 集群成员变化
+
+集群成员变化是在集群运行过程中副本发生变化，如增加/减少副本数、节点替换等
+
+成员变更也是一个分布式一致性问题，既所有服务器对新成员达成一致。但是成员变更又有其特殊性，因为在成员变更的一致性达成的过程中，参与投票的进程会发生变化。
+
+如果将**成员变更当成一般的一致性问题**，直接向Leader发送成员变更请求，Leader复制成员变更日志，达成多数派之后提交，各服务器提交成员变更日志后从旧成员配置（Cold）切换到新成员配置（Cnew）。
+
+因为各个服务器提交成员变更日志的时刻可能不同，造成各个服务器从旧成员配置（Cold）切换到新成员配置（Cnew）的时刻不同。
+
+成员变更不能影响服务的可用性，但是成员变更过程的某一时刻，可能出现在Cold和Cnew中同时存在两个不相交的多数派，进而可能选出两个Leader，形成不同的决议，破坏安全性。
+
+![架构](./pics/raft_13.png)
+
+**上图就是成员变更的某一时刻Cold和Cnew中同时存在两个不相交的多数派**
 
