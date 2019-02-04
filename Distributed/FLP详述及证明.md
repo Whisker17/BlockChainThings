@@ -2,7 +2,7 @@
 
 ## FLP
 
-在网络可靠，但允许节点失效（即便只有一个）的最小化异步模型系统中，不存在一个可以解决一致性问题的确定性共识算法 
+**在网络可靠，但允许节点失效（即便只有一个）的最小化异步模型系统中，不存在一个可以解决一致性问题的确定性共识算法** 
 
 ### 分布式异步网络模型
 
@@ -12,42 +12,44 @@
 
 ### 一致性协议系统以及各种定义
 
-· 一致性协议系统P由N个进程 (N>=2) 以及它们共有的一个消息队列组成，是一个异步系统。
+* 一致性协议系统P由N个进程 (N>=2) 以及它们共有的一个消息队列组成，是一个异步系统。
 
-·每个进程p由输入{可以为0，1}，transition函数、输出{可以为b，0，1}组成
-p取决于transition函数，但是一旦进程到达decision状态，transition函数也无法改变这个结果，因为输出register是一个“一次性写入”的。整个系统P是与每个进程的transition函数和输入register的初始值相关。
+* 每个进程p由输入{可以为0，1}，transition函数、输出{可以为b，0，1}组成。
+  p取决于transition函数，**但是一旦进程到达decision状态，transition函数也无法改变这个结果**，因为输出register是一个**“一次性写入”**的。整个系统P是与每个进程的transition函数和输入register的初始值相关。
 
-·通信队列：存储已经发送，但是还没有被接收的消息，不保证消息的投递顺序和速度
-如果消息的目标进程是正常的，保证最终可以将消息投递到对应的进程（可能投递/进程接收了很多次）
+* 通信队列：存储已经发送，但是还没有被接收的消息，**不保证消息的投递顺序和速度**。
+  如果消息的目标进程是正常的，保证最终可以将消息投递到对应的进程（可能投递/进程接收了很多次）
 
-·系统的configuration是由每个进程的内部状态和消息队列的内容组成,configuration是一组进程的状态
+* 系统的configuration是由每个进程的内部状态和消息队列的内容组成,**configuration是一组进程的状态**
 
-·进程p处理消息m，记为“事件e”，e = (p, m)
+* 进程p处理消息m，记为“事件e”，e = (p, m)
 
-·一个step由一个原始的step组成，通过一个configuration转换成另一个step。一般分成两步：  
-1. 在消息队列中取出value  
-2. 根据configuration中进程p的内部状态，改变p的内部状态，然后将消息传给其他进程  
-  run：一串step称为一个run，记为σ  
-  σ(C)：代表状态C在进过σ后的状态  
-  可到达状态: 若C1=σ(C0)，则称C0到C1是到可达(reachable)的  
-  可访问状态: 将从初始状态可达的状态都称为可访问(accessible)的  
-  进程正常：代表可以执行无限次的step(不断的从通信队列中获取消息，没有的话，就获取到空消息)，否则不正常。
+* 一个step由一个原始的step组成，通过一个configuration转换成另一个step。一般分成两步：  
 
-·admissible run：在该run内，最多只有一个进程不正常工作，并且所有发送到正常工作进行的消息最终都被接收到了  
-·deciding run：在该run内，有进程到达了决议状态(输出为确定值)  
-·确定的状态：如果某状态下，有进程的输出为决议值，则称该状态具有决议值    
-·部分正确的一致性协议：满足   
-a) 任何一个状态的决议值数量小于等于1；  
-b)对于任何一个0或者1的决议值v，都决议值为v的可访问状态。  
-·完全正确的一致性协议:   
-a) 部分正确；  
-b) 每一个admissible run都是deciding run  
-·令V为从C开始的所有可达状态的决定值的集合，则：  
-        bivalent: V元素数量为2  
-        univalent: V元素数量为1  
-        0-valent: 在V元素数量为1的情况下，结论值为0，对应的状态称为0价的  
-        1-valent: 与0-valent相对应  
-备注：根据“部分正确”的定义，可以推出，i-valent的状态及其之后所有的可达状态都是i-valent的
+  1. 在消息队列中取出value  
+
+  2. 根据configuration中进程p的内部状态，改变p的内部状态，然后将消息传给其他进程  
+     run：一串step称为一个run，记为σ  
+     σ(C)：代表状态C在进过σ后的状态  
+     可到达状态: 若C1=σ(C0)，则称C0到C1是到可达(reachable)的  
+     可访问状态: 将从初始状态可达的状态都称为可访问(accessible)的  
+     进程正常：代表可以执行无限次的step(不断的从通信队列中获取消息，没有的话，就获取到空消息)，否则不正常。
+
+* admissible run：在该run内，最多只有一个进程不正常工作，并且所有发送到正常工作进行的消息最终都被接收到了  
+* deciding run：在该run内，有进程到达了决议状态(输出为确定值)  
+* 确定的状态：如果某状态下，有进程的输出为决议值，则称该状态具有决议值    
+* 部分正确的一致性协议：满足   
+  a) 任何一个状态的决议值数量小于等于1；  
+  b)对于任何一个0或者1的决议值v，都决议值为v的可访问状态。  
+  ·完全正确的一致性协议:   
+  a) 部分正确；  
+  b) 每一个admissible run都是deciding run  
+  ·令V为从C开始的所有可达状态的决定值的集合，则：  
+          bivalent: V元素数量为2  
+          univalent: V元素数量为1  
+          0-valent: 在V元素数量为1的情况下，结论值为0，对应的状态称为0价的  
+          1-valent: 与0-valent相对应  
+  备注：根据“部分正确”的定义，可以推出，i-valent的状态及其之后所有的可达状态都是i-valent的
 
 ### 三条引理：
 
@@ -55,7 +57,7 @@ b) 每一个admissible run都是deciding run
 
 即交换性
 
-![Figure 1](pics\Figure_1.png)
+![Figure 1](./pics/Figure_1.png)
 
 **2.P has a bivalent initial configuration.**  
 
@@ -86,13 +88,13 @@ Cx和Cy是相邻的，且Cx是0-valent，Cy是1-valent。
 **论文版**：
 采用反证法，假设Dd内的状态都是univalent，假设Ei是C的i-valent配置，即Ei ∈ Cc，那么Fi=e(Ei)∈Dd。我们将可以通过step转换的称为neighbors，如下图：
 
-![Figure 2](pics\Figure_2.png)
+![Figure 2](./pics/Figure_2.png)
 
 存在一个neighbors C1和C0 ∈ Cc，而Di=e(Ci)是属于i-valent的，那么C1=e'(C0)，即e'=(p',m')的。有两种可能：
 1) 如果p' != p，那么根据交换律，e'(D0) = D1，矛盾
 2) 如果p' == p，如下图所示，σ是一个不包含p的deciding run，因为σ是deciding run，所以σ(C0)是univalent；而从A又可达E0和E1，则说明A是bivalent，所以矛盾。
 
-![Figure 3](pics\Figure_3.png)
+![Figure 3](./pics/Figure_3.png)
 
 **通俗版**：
 **令C是一个bivalent的初始configuration。e=(p,m)是一个可以应用到C的事件。X是不应用事件e到C的configuration的集合；Y是应用事件e到X的所有configuration的结果集合。那么Y包含一个bivalent的configuration。**
