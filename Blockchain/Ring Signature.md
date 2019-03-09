@@ -1,3 +1,0 @@
-# Ring Signature
-
-## Stealth Address
