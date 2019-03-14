@@ -14,5 +14,17 @@
 
 ## Stealth Address
 
-区别于Bitcoin，Monero的地址是通过两对公钥组成。 spend 是一部分， view 是另一部分。
+首先我们要确定的是，为什么我们需要 Stealth Address 。我们来假设一个这样的场景：
+
+Alice 是一家店铺的店主，她可以接受各种数字货币，比如 BTC ， ETH 之类的。那么她的所有的账目都是可以通过她的收款地址来得到，这样作为商业对手的 Bob 等人就可以通过查询该地址的流水来对 Alice 进行价格上的攻击。于是，对于交易的隐私性就孕育而生了。
+
+区别于 Bitcoin ， Monero 的地址是通过两对公钥组成。 spend 是一部分， view 是另一部分。
+
+一个 Monero 的标准地址如下所示：
+
+```
+network byte 18 + public spend key + public view key + checksum
+```
+
+前面是网络编码（可简单理解为前缀），中间是公开支付钥匙 + 公开查看钥匙，后面是校验和（可简单理解为后缀）。
 
