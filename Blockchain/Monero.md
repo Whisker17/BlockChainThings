@@ -14,5 +14,5 @@
 
 ## Stealth Address
 
-区别于Bitcoin，Monero的地址是通过两对公钥组成。支付是一部分，查看是另一部分。
+区别于Bitcoin，Monero的地址是通过两对公钥组成。 spend 是一部分， view 是另一部分。
 
