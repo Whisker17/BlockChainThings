@@ -6,7 +6,7 @@
 
 - [**共识模块**](#共识模块)
 - [**分布式相关**](#分布式相关)
-- [**BlockChain 其他相关**](#BlockChain 其他相关)
+- [**BlockChain其他相关**](#BlockChain其他相关)
 
 ### 共识模块
 
@@ -48,7 +48,7 @@
 
 
 
-### BlockChain 其他相关
+### BlockChain其他相关
 
 - [**Bitcoin的扩容与分叉**](https://github.com/Whisker17/BlockChain_Get_Job/blob/master/Blockchain/Bitcoin%E7%9A%84%E6%89%A9%E5%AE%B9%E4%B8%8E%E5%88%86%E5%8F%89.md)
 - [**LevelDB**](https://github.com/Whisker17/BlockChain_Get_Job/blob/master/Blockchain/LevelDB.md)
