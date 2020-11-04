@@ -1,12 +1,12 @@
 # RAFT协议详解
 
-我们都知道，当代分布式一致性协议可以说是由Paxos领导的，而Paxos的出发点是从分布式一致性问题的角度出发，而我们本文要介绍的Raft则是从多副本状态机的角度提出推导。
+我们都知道，当代分布式一致性协议可以说是由 Paxos 领导的，而 Paxos 的出发点是从分布式一致性问题的角度出发，而我们本文要介绍的 Raft 则是从多副本状态机的角度提出推导。
 
 分布式存储系统通常通过维护多个副本来进行容错，提高系统的可用性。要实现此目标，就必须要解决分布式存储系统的最核心问题：**维护多个副本的一致性。**
 
-**一致性：**在一个具有一致性的性质的集群中，同一时刻中所有的节点对于存储在其中的某个值都有相同的结果，即对其共享的存储保持一致。
+**一致性**：在一个具有一致性的性质的集群中，同一时刻中所有的节点对于存储在其中的某个值都有相同的结果，即对其共享的存储保持一致。
 
-一致性协议就是用来干这事的，用来保证**即使在部分(确切地说是小部分)副本宕机**的情况下，系统仍然能正常对外提供服务。一致性协议通常基于replicated state machines（复制状态机），即所有结点都从同一个state出发，都经过同样的一些操作序列（log），最后到达同样的state。
+一致性协议就是用来干这事的，用来保证**即使在部分(确切地说是小部分)副本宕机**的情况下，系统仍然能正常对外提供服务。一致性协议通常基于 replicated state machines（**复制状态机**），即所有结点都从同一个 state 出发，都经过同样的一些操作序列（log），最后到达同样的 state 。
 
 ## 架构
 
@@ -20,7 +20,7 @@
 
 ### 复制状态机
 
-我们知道，复制状态机通过集群方式，由此给客户提供一个强一致、高可用的数据服务。所谓强一致，就是客户看来他们可以一直读到最新的写成功的数据；而在服务内部就是一个所有状态机中的数据高度一致的现象。而高可用，就是即使出现网络延迟、丢包、乱序、服务器宕机的情况，数据已就可以保证一致性。
+我们知道，复制状态机通过**集群方式**，由此给客户提供一个**强一致**、**高可用**的数据服务。所谓强一致，就是客户看来他们可以一直读到最新的写成功的数据；而在服务内部就是一个所有状态机中的数据高度一致的现象。而高可用，就是即使出现网络延迟、丢包、乱序、服务器宕机的情况，数据已就可以保证一致性。
 
 对于复制状态机来说，他们是按序读取本地的log信息，由此来进行计算从而得到一个输出的。
 
@@ -28,7 +28,7 @@
 
 ![架构](./pics/raft_12.png)
 
-我们可以看到，上图就是我们Raft协议的一个核心数据结构——Log。
+我们可以看到，上图就是我们 Raft 协议的一个核心数据结构——Log。
 
 1. 每一条日志都有日志序号（log index）
 2. 每一条日志记录除了保存 state machine 要执行的操作（如 x ← 0）外，还需要保存该操作对应的 Term
@@ -37,12 +37,12 @@
 
 ## 协议内容
 
-Raft 是一种分布式一致性协议，类似的协议还有我们之前讲过的Paxos，可以把 Raft 协议看作是 Paxos 协议的变种。Raft 主打的是易理解，其易理解主要在两方面：
+Raft 是一种分布式一致性协议，类似的协议还有我们之前讲过的 Paxos ，可以把 Raft 协议看作是 Paxos 协议的变种。Raft 主打的是**易理解**，其易理解主要在两方面：
 
-1. 强化 leader 的作用，日志只能从 leader 流向 follower
-2. 日志是连续的，中间没有空洞
+1. **强化 leader 的作用，日志只能从 leader 流向 follower**
+2. **日志是连续的，中间没有空洞**
 
-即，**Raft是一种基于多副本的强Leader的一致性算法**
+即，**Raft是一种基于多副本的强 Leader 的一致性算法**
 
 Raft协议的每个副本都会处于三种状态之一：**Leader、Follower、Candidate**
 
@@ -54,33 +54,33 @@ Raft协议的每个副本都会处于三种状态之一：**Leader、Follower、
 
 ### Leader Election
 
-当Leader节点由于异常（宕机、网络故障等）无法继续提供服务时，可以认为它结束了本轮任期（Term=n），需要开始新一轮的Leader Election，而新的Leader当然要从Follower中产生，开始新一轮的任期（Term=n+1）。
+当 Leader 节点由于异常（宕机、网络故障等）无法继续提供服务时，可以认为它结束了本轮任期（Term=n），需要开始新一轮的 Leader Election ，而新的 Leader 当然要从 Follower 中产生，开始新一轮的任期（Term=n+1）。
 
-我们在这里简单介绍一下Term的含义，作为一个logic clock，Term有两个主要作用：
+我们在这里简单介绍一下 Term 的含义，作为一个 logic clock ，Term 有两个主要作用：
 
-1. 识别过期信息
-2. 通过限制使得在每个Term之内只能进行一次投票，由此来保证每个Term之中只会存在一个Leader。
+1. **识别过期信息**
+2. **通过限制使得在每个Term之内只能进行一次投票，由此来保证每个Term之中只会存在一个Leader**。
 
-首先我们明确，系统的初始状态是不存在Leader的，各个成员都是以Follower的形式存在，由于在一定时间内没有收到Heartbeat，此时Follower会进行一个竞选的过程：
+首先我们明确，系统的初始状态是不存在 Leader 的，各个成员都是以 Follower 的形式存在，由于在一定时间内没有收到 Heartbeat ，此时 Follower 会进行一个竞选的过程：
 
-1. 节点状态从Follower变成Candidate，对自己节点的Term自加1
-2. 所有Candidate节点给自己投1票，同时向其他所有节点发送拉票请求（RequestVoteRPC）
-3. Candidate节点等待投票结果
+1. 节点状态从 Follower 变成 Candidate ，对自己节点的 Term 自加1
+2. 所有 Candidate 节点给自己投1票，同时向其他所有节点发送拉票请求（RequestVoteRPC）
+3.  Candidate 节点等待投票结果
 
 在这里我们有三种可能：
 
-1. **自己被选成了主。**当收到了majority的投票后，状态切成Leader，并且定期给其它的所有server发Heartbeat消息（不带log的AppendEntriesRPC）以告诉对方自己是current_term_id所标识的term的leader。**每个term最多只有一个Leader**，term id作为logical clock，在每个RPC消息中都会带上，**用于检测过期的消息**。当一个server收到的RPC消息中的rpc_term_id比本地的current_term_id更大时，就更新current_term_id为rpc_term_id，并且如果当前state为leader或者candidate时，将自己的状态切成follower。如果rpc_term_id比本地的current_term_id更小，则拒绝这个RPC消息。
-2. **别人成为了主。**如1所述，当Candidator在等待投票的过程中，收到了大于或者等于本地的current_term_id的声明对方是leader的AppendEntriesRPC时，则将自己的state切成follower，并且更新本地的current_term_id。
-3. **没有选出主。**当投票被瓜分，没有任何一个candidate收到了majority的vote时，没有leader被选出。这种情况下，每个candidate等待的投票的过程就超时了，**接着candidates都会将本地的current_term_id再加1**，发起RequestVoteRPC进行新一轮的leader election。
+1. **自己被选成了主**。当收到了 majority 的投票后，状态切成 Leader ，并且定期给其它的所有 server 发 Heartbeat 消息（不带 log 的 AppendEntriesRPC ）以告诉对方自己是 current_term_id 所标识的 term 的 leader 。**每个 term 最多只有一个 Leader **，term id 作为 logical clock ，在每个 RPC 消息中都会带上，**用于检测过期的消息**。当一个 server 收到的 RPC 消息中的 rpc_term_id 比本地的 current_term_id 更大时，就更新 current_term_id 为 rpc_term_id ，并且如果当前 state 为 leader 或者 candidate 时，将自己的状态切成 follower 。如果 rpc_term_id 比本地的 current_term_id 更小，则拒绝这个 RPC 消息。
+2. **别人成为了主**。如 1 所述，当 Candidator 在等待投票的过程中，收到了大于或者等于本地的 current_term_id 的声明对方是 leader 的 AppendEntriesRPC 时，则将自己的 state 切成 follower ，并且更新本地的 current_term_id 。
+3. **没有选出主**。当投票被瓜分，没有任何一个 candidate 收到了 majority 的 vote 时，没有 leader 被选出。这种情况下，每个 candidate 等待的投票的过程就超时了，**接着 candidates 都会将本地的 current_term_id 再加1**，发起 RequestVoteRPC 进行新一轮的 leader election 。
 
 投票策略：
 
-* 每个节点只会给每个term投一票，具体的是否同意和后续的Safety有关。
-* 当投票被瓜分后，所有的candidate同时超时，然后有可能进入新一轮的票数被瓜分，为了避免这个问题，Raft采用一种很简单的方法：每个Candidate的election timeout从150ms-300ms之间随机取，那么第一个超时的Candidate就可以发起新一轮的leader election，带着最大的term_id给其它所有server发送RequestVoteRPC消息，从而自己成为leader，然后给他们发送心跳消息以告诉他们自己是主。
+* 每个节点只会给每个 term 投一票，具体的是否同意和后续的 Safety 有关。
+* 当投票被瓜分后，所有的 candidate 同时超时，然后有可能进入新一轮的票数被瓜分，为了避免这个问题，Raft 采用一种很简单的方法：每个 Candidate 的 election timeout 从 150ms-300ms 之间随机取，那么第一个超时的 Candidate 就可以发起新一轮的 leader election ，带着最大的 term_id 给其它所有 server 发送 RequestVoteRPC 消息，从而自己成为 leader ，然后给他们发送心跳消息以告诉他们自己是主。
 
-不难解释，不是所有的Follower都有资格成为Leader，因为如果一个Follower缺少之前的Leader已经commit的Log，那么它无论如何都无法复制到缺少的那部分Log的，所以我们在这里有一个约束：
+不难解释，**不是所有的 Follower 都有资格成为 Leader** ，因为如果一个 Follower 缺少之前的 Leader 已经 commit 的 Log ，那么它无论如何都无法复制到缺少的那部分 Log 的，所以我们在这里有一个约束：
 
-**Candidate在拉票时需要携带自己本地已经持久化的最新的日志信息，等待投票的节点如果发现自己本地的日志信息比竞选的Candidate更新，则拒绝给他投票。**
+**Candidate 在拉票时需要携带自己本地已经持久化的最新的日志信息，等待投票的节点如果发现自己本地的日志信息比竞选的 Candidate 更新，则拒绝给他投票。**
 
 ### Log Replication
 
