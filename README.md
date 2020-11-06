@@ -56,5 +56,7 @@
 - [**Monero 的环签名**](https://github.com/Whisker17/BlockChain_Get_Job/blob/master/Blockchain/Monero.md)
 - [**椭圆曲线算法**](https://github.com/Whisker17/BlockChain_Get_Job/blob/master/Blockchain/%E6%A4%AD%E5%9C%86%E6%9B%B2%E7%BA%BF%E7%AE%97%E6%B3%95.md)
 
+- [**区块链虚拟机详解**](https://github.com/Whisker17/BlockChain_Get_Job/issues/1)
+
 
 
