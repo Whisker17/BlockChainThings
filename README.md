@@ -1,4 +1,4 @@
-# BlockChain_Get_Job
+# BlockChainThings
 
 这个repo是我将我之前所阅读过的一些文章和自己的一些笔记进行的整理。
 
